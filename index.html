@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text-to-Speech Grid</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      padding: 20px;
+    }
+
+    button {
+      margin: 5px 5px 5px 0;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+    }
+
+    .panel-wrapper {
+      background: white;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    .accordion-toggle, #mainAccordionBtn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .accordion-content {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    label {
+      font-weight: bold;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    textarea {
+      width: 100%;
+    }
+
+    select, input[type="range"], input[type="number"] {
+      width: 100%;
+    }
+
+    #uploadBoard {
+      display: none;
+    }
+
+    label[for="uploadBoard"] {
+      background: #007BFF;
+      color: white;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      display: inline-block;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <button id="playAll">▶️ Play All</button>
+  <button id="mainAccordionBtn">Show All Panels ▼</button>
+  <button id="downloadBoard">⬇️ Download Board</button>
+  <input type="file" id="uploadBoard" accept=".json">
+  <label for="uploadBoard">⬆️ Upload Board</label>
+
+  <div id="mainAccordionContent" class="accordion-content">
+    <div id="panelContainer" class="panel-grid"></div>
+  </div>
+
+  <script>
+    window.addEventListener("load", () => {
+      const synth = window.speechSynthesis;
+      let voices = [];
+
+      function listVoices() {
+        voices = synth.getVoices();
+        for (let i = 0; i < 30; i++) {
+          const voiceSelect = document.getElementById(`voice-${i}`);
+          if (!voiceSelect) continue;
+          voiceSelect.innerHTML = '';
+          for (let voice of voices) {
+            let option = document.createElement('option');
+            option.textContent = `${voice.name} (${voice.lang})`;
+            option.setAttribute('data-name', voice.name);
+            voiceSelect.appendChild(option);
+          }
+        }
+      }
+
+      function createPanel(index) {
+        const container = document.getElementById("panelContainer");
+        const panel = document.createElement("div");
+        panel.className = "panel-wrapper";
+
+        panel.innerHTML = `
+          <textarea id="say-${index}" rows="1" placeholder="Enter text to speak..."></textarea><br>
+          <input type="button" id="speak-${index}" value="Speak">
+          <button id="toggleAccordion-${index}" class="accordion-toggle">Show Settings ▼</button>
+          <div id="accordionContent-${index}" class="accordion-content">
+            <div class="field">
+              <label for="voice-${index}">Voice</label>
+              <select id="voice-${index}"></select>
+            </div>
+            <div class="field">
+              <label for="volume-${index}">Volume</label>
+              <input type="range" id="volume-${index}" min="0" max="1" step="0.01" value="0.5">
+              <output for="volume-${index}">0.5</output>
+            </div>
+            <div class="field">
+              <label for="pitch-${index}">Pitch</label>
+              <input type="range" id="pitch-${index}" min="0" max="2" step="0.01" value="1">
+              <output for="pitch-${index}">1</output>
+            </div>
+            <div class="field">
+              <label for="rate-${index}">Rate</label>
+              <input type="range" id="rate-${index}" min="0.1" max="10" step="0.1" value="1">
+              <output for="rate-${index}">1</output>
+            </div>
+            <div class="field">
+              <label for="delay-${index}">Extra Delay (seconds)</label>
+              <input type="number" id="delay-${index}" min="0" step="0.1" value="0">
+            </div>
+          </div>
+        `;
+
+        container.appendChild(panel);
+
+        document.getElementById(`toggleAccordion-${index}`).addEventListener("click", () => {
+          const content = document.getElementById(`accordionContent-${index}`);
+          const btn = document.getElementById(`toggleAccordion-${index}`);
+          if (content.style.display === "none" || content.style.display === "") {
+            content.style.display = "block";
+            btn.textContent = "Hide Settings ▲";
+          } else {
+            content.style.display = "none";
+            btn.textContent = "Show Settings ▼";
+          }
+        });
+
+        for (let prop of ["volume", "pitch", "rate"]) {
+          const range = document.getElementById(`${prop}-${index}`);
+          const output = range.nextElementSibling;
+          range.addEventListener("input", () => {
+            output.textContent = range.value;
+          });
+        }
+
+        document.getElementById(`speak-${index}`).addEventListener("click", () => {
+          const sayText = document.getElementById(`say-${index}`).value;
+          const utter = new SpeechSynthesisUtterance(sayText);
+          const voiceName = document.getElementById(`voice-${index}`).selectedOptions[0]?.getAttribute('data-name');
+          utter.voice = voices.find(v => v.name === voiceName);
+          utter.volume = parseFloat(document.getElementById(`volume-${index}`).value);
+          utter.pitch = parseFloat(document.getElementById(`pitch-${index}`).value);
+          utter.rate = parseFloat(document.getElementById(`rate-${index}`).value);
+          synth.speak(utter);
+        });
+      }
+
+      for (let i = 0; i < 30; i++) {
+        createPanel(i);
+      }
+
+      if (synth.onvoiceschanged !== undefined) {
+        synth.onvoiceschanged = listVoices;
+      }
+      listVoices();
+
+      document.getElementById("playAll").addEventListener("click", () => {
+        let index = 0;
+
+        function speakNext() {
+          if (index >= 30) return;
+          const sayText = document.getElementById(`say-${index}`).value.trim();
+          if (!sayText) {
+            index++;
+            speakNext();
+            return;
+          }
+
+          const utter = new SpeechSynthesisUtterance(sayText);
+          const voiceName = document.getElementById(`voice-${index}`).selectedOptions[0]?.getAttribute('data-name');
+          utter.voice = voices.find(v => v.name === voiceName);
+          utter.volume = parseFloat(document.getElementById(`volume-${index}`).value);
+          utter.pitch = parseFloat(document.getElementById(`pitch-${index}`).value);
+          utter.rate = parseFloat(document.getElementById(`rate-${index}`).value);
+
+          utter.onend = () => {
+            const delay = parseFloat(document.getElementById(`delay-${index}`).value) * 1000 || 0;
+            setTimeout(() => {
+              index++;
+              speakNext();
+            }, delay);
+          };
+
+          synth.speak(utter);
+        }
+
+        if (!synth.speaking) {
+          speakNext();
+        }
+      });
+
+      document.getElementById("mainAccordionBtn").addEventListener("click", () => {
+        const mainContent = document.getElementById("mainAccordionContent");
+        if (mainContent.style.display === "none" || mainContent.style.display === "") {
+          mainContent.style.display = "block";
+          event.target.textContent = "Hide All Panels ▲";
+        } else {
+          mainContent.style.display = "none";
+          event.target.textContent = "Show All Panels ▼";
+        }
+      });
+
+      // Download to JSON
+      document.getElementById("downloadBoard").addEventListener("click", () => {
+        const boardData = [];
+        for (let i = 0; i < 30; i++) {
+          boardData.push({
+            text: document.getElementById(`say-${i}`).value,
+            voice: document.getElementById(`voice-${i}`).selectedOptions[0]?.getAttribute('data-name') || '',
+            volume: document.getElementById(`volume-${i}`).value,
+            pitch: document.getElementById(`pitch-${i}`).value,
+            rate: document.getElementById(`rate-${i}`).value,
+            delay: document.getElementById(`delay-${i}`).value
+          });
+        }
+        const blob = new Blob([JSON.stringify(boardData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "voice-board.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // Upload from JSON
+      document.getElementById("uploadBoard").addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const boardData = JSON.parse(reader.result);
+            for (let i = 0; i < boardData.length; i++) {
+              document.getElementById(`say-${i}`).value = boardData[i].text || '';
+              document.getElementById(`volume-${i}`).value = boardData[i].volume;
+              document.getElementById(`volume-${i}`).nextElementSibling.textContent = boardData[i].volume;
+
+              document.getElementById(`pitch-${i}`).value = boardData[i].pitch;
+              document.getElementById(`pitch-${i}`).nextElementSibling.textContent = boardData[i].pitch;
+
+              document.getElementById(`rate-${i}`).value = boardData[i].rate;
+              document.getElementById(`rate-${i}`).nextElementSibling.textContent = boardData[i].rate;
+
+              document.getElementById(`delay-${i}`).value = boardData[i].delay;
+
+              const voiceSelect = document.getElementById(`voice-${i}`);
+              const setVoice = () => {
+                if (voiceSelect.options.length === 0) {
+                  setTimeout(setVoice, 100);
+                  return;
+                }
+                for (let option of voiceSelect.options) {
+                  if (option.getAttribute('data-name') === boardData[i].voice) {
+                    option.selected = true;
+                    break;
+                  }
+                }
+              };
+              setVoice();
+            }
+            alert("Board loaded from file!");
+          } catch (e) {
+            alert("Failed to load board: Invalid file.");
+          }
+        };
+        reader.readAsText(file);
+      });
+    });
+  </script>
+</body>
+</html>
